@@ -12,10 +12,6 @@ templates = Jinja2Templates(directory="templates")
 model = joblib.load("server_overload_xgb.pkl")
 feature_names = joblib.load("feature_names.pkl")
 
-# Load test data for random sample mode
-X_test = pd.read_csv("cleaned_data/X_test.csv")
-y_test = pd.read_csv("cleaned_data/y_test.csv").squeeze()
-
 @app.get("/")
 def serve_landing(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
@@ -23,26 +19,6 @@ def serve_landing(request: Request):
 @app.get("/dashboard")
 def serve_dashboard(request: Request):
     return templates.TemplateResponse("dashboard.html", {"request": request})
-
-@app.get("/random_sample")
-def random_sample():
-    """Return a random real sample from the test set with its true label."""
-    idx = np.random.randint(0, len(X_test))
-    row = X_test.iloc[idx]
-    true_label = int(y_test.iloc[idx])
-
-    df = pd.DataFrame([row])
-    df = df[feature_names]
-    prob = model.predict_proba(df)[0][1]
-    prediction = int(prob >= 0.3)
-
-    return {
-        "features": row.to_dict(),
-        "overload_probability": round(float(prob), 4),
-        "early_warning": prediction,
-        "true_label": true_label,
-        "sample_index": int(idx)
-    }
 
 @app.post("/predict")
 def predict(data: dict):

@@ -134,38 +134,6 @@
             padding: 0 1.5rem; 
         }
 
-        .tabs { 
-            display: flex; 
-            background: rgba(0, 0, 0, 0.3);
-            border-radius: 12px; 
-            padding: 0.35rem;
-            border: 1px solid var(--border-glass);
-            margin-bottom: 2.5rem;
-            position: relative;
-        }
-
-        .tab {
-            flex: 1; 
-            padding: 0.75rem 1rem; 
-            text-align: center; 
-            cursor: pointer;
-            font-weight: 500; 
-            font-size: 0.9rem;
-            color: var(--text-muted);
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            border-radius: 8px;
-            z-index: 1;
-        }
-
-        .tab:hover { color: var(--text-main); }
-        
-        .tab.active { 
-            background: rgba(255, 255, 255, 0.08); 
-            color: #fff; 
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
-            border: 1px solid rgba(255, 255, 255, 0.05);
-        }
-
         /* ==========================================================================
            5. RESULT BANNER (PREDICTION DISPLAY)
            ========================================================================== */
@@ -311,38 +279,6 @@
         /* ==========================================================================
            7. DATA GRIDS & METRICS
            ========================================================================== */
-        .sample-info { 
-            display: grid; 
-            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); 
-            gap: 1.25rem; 
-        }
-
-        .info-item { 
-            background: rgba(0, 0, 0, 0.2); 
-            border: 1px solid var(--border-glass);
-            border-radius: 10px; 
-            padding: 1rem; 
-            transition: background 0.2s;
-        }
-        
-        .info-item:hover { background: rgba(255, 255, 255, 0.03); }
-
-        .info-item .info-label { 
-            font-size: 0.7rem; 
-            color: var(--text-subtle); 
-            font-weight: 600; 
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
-
-        .info-item .info-val { 
-            font-size: 1.25rem; 
-            color: var(--text-main); 
-            font-weight: 600; 
-            margin-top: 0.4rem; 
-            font-variant-numeric: tabular-nums;
-        }
-
         /* ==========================================================================
            8. MODERN SLIDERS
            ========================================================================== */
@@ -476,18 +412,6 @@
             100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
         }
 
-        .empty-state {
-            color: var(--text-subtle); 
-            text-align: center; 
-            grid-column: 1 / -1; 
-            padding: 3rem 1rem;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .empty-state b { color: var(--text-muted); }
     </style>
 </head>
 <body>
@@ -502,11 +426,6 @@
 </div>
 
 <div class="container">
-
-    <div class="tabs">
-        <div class="tab active" onclick="switchTab('sample')">Live Snapshot</div>
-        <div class="tab" onclick="switchTab('slider')">Capacity Scenario Test</div>
-    </div>
 
     <div id="resultBanner" class="result-banner">
         <div class="result-content">
@@ -530,28 +449,7 @@
         </div>
     </div>
 
-    <div id="samplePanel" class="mode-panel active">
-        <div class="card">
-            <div class="section-title">Current System Metrics</div>
-            <div class="sample-info" id="sampleInfo">
-                <div class="empty-state">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:0.5rem; opacity: 0.5;">
-                        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
-                    </svg>
-                    <span>No metrics loaded in current session.</span>
-                    <span>Click <b>Fetch Latest Snapshot</b> to retrieve live server stream.</span>
-                </div>
-            </div>
-        </div>
-        <div class="btn-row">
-            <button class="btn btn-primary" onclick="loadSample()">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"></path><path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path><path d="M3 22v-6h6"></path><path d="M21 12a9 9 0 0 1-15 6.7L3 16"></path></svg>
-                Fetch Latest Snapshot
-            </button>
-        </div>
-    </div>
-
-    <div id="sliderPanel" class="mode-panel">
+    <div id="sliderPanel" class="mode-panel active">
         <div class="card">
             <div class="section-title">Adjust Environmental Variables</div>
             <div class="slider-grid">
@@ -588,21 +486,6 @@
 </div>
 
 <script>
-/* ---- Tab switching ---- */
-function switchTab(mode) {
-    document.querySelectorAll('.tab').forEach((t, i) => {
-        t.classList.toggle('active', (mode === 'sample' && i === 0) || (mode === 'slider' && i === 1));
-    });
-    
-    document.getElementById('samplePanel').classList.toggle('active', mode === 'sample');
-    document.getElementById('sliderPanel').classList.toggle('active', mode === 'slider');
-    
-    // Reset banner on tab switch
-    const b = document.getElementById('resultBanner');
-    b.className = 'result-banner';
-    b.style.display = 'none';
-}
-
 /* ---- Gauge UI Logic ---- */
 function setGauge(pct) {
     const arc = 157; // Total arc length for our specific SVG path
@@ -648,56 +531,7 @@ function showResult(stressIndex, isCritical, logHtml) {
     setTimeout(() => setGauge(stressIndex), 50);
 }
 
-/* ---- SNAPSHOT MODE (Logic Unchanged) ---- */
-const displayKeys = [
-    ["CPU_Utilization_%", "CPU Util (%)"],
-    ["CPU1_Temp_C", "CPU1 Temp (°C)"],
-    ["CPU2_Temp_C", "CPU2 Temp (°C)"],
-    ["Memory_Utilization_%", "Memory (%)"],
-    ["System_Power_W", "Power (W)"],
-    ["Avg_Fan_Speed_RPM", "Fan (RPM)"],
-    ["Inlet_Temp_C", "Inlet (°C)"],
-    ["Exhaust_Temp_C", "Exhaust (°C)"],
-    ["Air_Flow_CFM", "Airflow (CFM)"],
-    ["Voltage_V", "Voltage (V)"],
-    ["Clock_Speed_GHz", "Clock (GHz)"],
-    ["hour", "Hour Logged"],
-    ["day_of_week", "Day Logged"]
-];
-
-async function loadSample() {
-    try {
-        const res = await fetch('/random_sample');
-        const data = await res.json();
-        
-        const info = document.getElementById('sampleInfo');
-        info.innerHTML = '';
-        
-        displayKeys.forEach(([key, label]) => {
-            const v = data.features[key];
-            if (v !== undefined) {
-                info.innerHTML += `
-                    <div class="info-item">
-                        <div class="info-label">${label}</div>
-                        <div class="info-val">${typeof v === 'number' ? v.toFixed(2) : v}</div>
-                    </div>`;
-            }
-        });
-        
-        const logStatus = data.true_label === 1 
-            ? '<span style="color:var(--status-critical); font-weight:600;">Capacity Exceeded</span>' 
-            : '<span style="color:var(--status-safe); font-weight:600;">Stable</span>';
-            
-        const logHtml = `Diagnostic Log Ground Truth: ${logStatus} &nbsp;|&nbsp; Ref ID: #${data.sample_index}`;
-        
-        showResult(data.overload_probability, data.early_warning, logHtml);
-        
-    } catch (err) { 
-        alert('Diagnostic Fetch Error: ' + err.message); 
-    }
-}
-
-/* ---- SCENARIO MODE (Logic Unchanged) ---- */
+/* ---- SCENARIO MODE ---- */
 function updateSlider() {
     document.getElementById('cpuVal').textContent = parseFloat(document.getElementById('cpuSlider').value).toFixed(1) + '%';
     document.getElementById('tempVal').textContent = parseFloat(document.getElementById('tempSlider').value).toFixed(1) + '°C';
