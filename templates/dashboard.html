@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sentinel ML | Server Diagnostics</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* ==========================================================================
+           1. DESIGN SYSTEM & VARIABLES
+           ========================================================================== */
+        :root {
+            /* Deep, dimensional dark theme */
+            --bg-base: #030712; 
+            --bg-panel: rgba(17, 24, 39, 0.6);
+            --bg-panel-hover: rgba(31, 41, 55, 0.7);
+            
+            /* Borders & Glassmorphism */
+            --border-glass: rgba(255, 255, 255, 0.08);
+            --border-glass-hover: rgba(255, 255, 255, 0.15);
+            --glass-blur: blur(16px);
+            --glass-shadow: 0 4px 30px rgba(0, 0, 0, 0.4);
+            
+            /* Typography */
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --text-subtle: #64748b;
+            --font-stack: 'Inter', system-ui, -apple-system, sans-serif;
+            
+            /* Accents & Status */
+            --accent-blue: #3b82f6;
+            --accent-blue-glow: rgba(59, 130, 246, 0.5);
+            --accent-hover: #2563eb;
+            --status-safe: #10b981;
+            --status-warn: #f59e0b;
+            --status-critical: #ef4444;
+            --status-safe-glow: rgba(16, 185, 129, 0.2);
+            --status-critical-glow: rgba(239, 68, 68, 0.2);
+        }
+
+        /* ==========================================================================
+           2. GLOBAL RESETS & BACKGROUND
+           ========================================================================== */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: var(--font-stack);
+            background-color: var(--bg-base);
+            color: var(--text-main);
+            min-height: 100vh;
+            line-height: 1.5;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            overflow-x: hidden;
+            
+            /* Futuristic Grid & Ambient Glow Background */
+            background-image: 
+                radial-gradient(circle at 50% 0%, rgba(59, 130, 246, 0.15), transparent 50%),
+                linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+            background-size: 100% 100%, 32px 32px, 32px 32px;
+            background-attachment: fixed;
+        }
+
+        /* ==========================================================================
+           3. TOP NAVIGATION (HEADER)
+           ========================================================================== */
+        .header {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: rgba(3, 7, 18, 0.7);
+            backdrop-filter: var(--glass-blur);
+            -webkit-backdrop-filter: var(--glass-blur);
+            border-bottom: 1px solid var(--border-glass);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .live-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--status-safe);
+            border-radius: 50%;
+            box-shadow: 0 0 12px var(--status-safe);
+            animation: pulse 2s infinite;
+        }
+
+        .brand-name {
+            font-size: 1.1rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            color: #fff;
+        }
+
+        .header-title {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            font-weight: 500;
+            display: none;
+        }
+
+        @media (min-width: 768px) {
+            .header-title { display: block; }
+        }
+
+        .badge {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-glass);
+            padding: 0.25rem 0.75rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            letter-spacing: 0.05em;
+        }
+
+        /* ==========================================================================
+           4. LAYOUT & TABS (SEGMENTED CONTROL)
+           ========================================================================== */
+        .container { 
+            max-width: 960px; 
+            margin: 2.5rem auto; 
+            padding: 0 1.5rem; 
+        }
+
+        .tabs { 
+            display: flex; 
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 12px; 
+            padding: 0.35rem;
+            border: 1px solid var(--border-glass);
+            margin-bottom: 2.5rem;
+            position: relative;
+        }
+
+        .tab {
+            flex: 1; 
+            padding: 0.75rem 1rem; 
+            text-align: center; 
+            cursor: pointer;
+            font-weight: 500; 
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border-radius: 8px;
+            z-index: 1;
+        }
+
+        .tab:hover { color: var(--text-main); }
+        
+        .tab.active { 
+            background: rgba(255, 255, 255, 0.08); 
+            color: #fff; 
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        /* ==========================================================================
+           5. RESULT BANNER (PREDICTION DISPLAY)
+           ========================================================================== */
+        .result-banner {
+            display: none; 
+            background: var(--bg-panel);
+            backdrop-filter: var(--glass-blur);
+            -webkit-backdrop-filter: var(--glass-blur);
+            border-radius: 16px; 
+            padding: 2.5rem 2rem;
+            margin-bottom: 2rem; 
+            text-align: center; 
+            border: 1px solid var(--border-glass);
+            box-shadow: var(--glass-shadow);
+            animation: slideDownFade 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Soft background glows based on status */
+        .result-banner::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; height: 100%;
+            background: radial-gradient(circle at top, var(--glow-color, transparent), transparent 70%);
+            opacity: 0.15;
+            pointer-events: none;
+            z-index: 0;
+        }
+        .result-banner.safe { --glow-color: var(--status-safe); border-top: 1px solid rgba(16, 185, 129, 0.4); }
+        .result-banner.warning { --glow-color: var(--status-critical); border-top: 1px solid rgba(239, 68, 68, 0.4); }
+        
+        .result-content { position: relative; z-index: 1; }
+
+        /* Enhanced Premium Gauge */
+        .gauge-wrap { display: flex; justify-content: center; margin-bottom: 0.5rem; }
+        .gauge { width: 180px; height: 90px; position: relative; }
+        .gauge svg { width: 100%; height: 100%; overflow: visible; }
+        .gauge-bg { fill: none; stroke: rgba(255,255,255,0.05); stroke-width: 14; stroke-linecap: round; }
+        .gauge-fill { 
+            fill: none; 
+            stroke-width: 14; 
+            stroke-linecap: round;
+            filter: drop-shadow(0 0 6px currentColor);
+            transition: stroke-dashoffset 1.2s cubic-bezier(0.22, 1, 0.36, 1), stroke 0.6s ease; 
+        }
+
+        .confidence-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-subtle);
+            margin-bottom: 0.25rem;
+            font-weight: 600;
+        }
+
+        .prob { 
+            font-size: 3.5rem; 
+            font-weight: 700; 
+            font-variant-numeric: tabular-nums; 
+            line-height: 1;
+            background: linear-gradient(180deg, #fff 0%, #cbd5e1 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.5rem;
+        }
+
+        .label { 
+            display: inline-block;
+            padding: 0.35rem 1rem;
+            border-radius: 20px;
+            font-size: 0.85rem; 
+            font-weight: 600; 
+            letter-spacing: 0.02em;
+            margin-top: 0.5rem; 
+            background: rgba(0,0,0,0.3);
+            border: 1px solid var(--border-glass);
+        }
+
+        .warning .label { color: #fca5a5; border-color: rgba(239, 68, 68, 0.3); }
+        .safe .label { color: #6ee7b7; border-color: rgba(16, 185, 129, 0.3); }
+
+        .truth { 
+            font-size: 0.8rem; 
+            margin-top: 1.5rem; 
+            color: var(--text-muted); 
+            padding-top: 1.25rem; 
+            border-top: 1px solid var(--border-glass); 
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .ml-context {
+            font-size: 0.75rem;
+            color: var(--text-subtle);
+            margin-top: 0.5rem;
+            font-style: italic;
+        }
+
+        /* ==========================================================================
+           6. GLASSMORPHISM CARDS
+           ========================================================================== */
+        .card {
+            background: var(--bg-panel);
+            backdrop-filter: var(--glass-blur);
+            -webkit-backdrop-filter: var(--glass-blur);
+            border: 1px solid var(--border-glass);
+            border-radius: 16px; 
+            padding: 2rem; 
+            margin-bottom: 1.5rem;
+            box-shadow: var(--glass-shadow);
+            transition: transform 0.3s ease, border-color 0.3s ease;
+        }
+        
+        .card:hover {
+            transform: translateY(-2px);
+            border-color: var(--border-glass-hover);
+        }
+
+        .section-title { 
+            font-size: 1.05rem; 
+            font-weight: 600; 
+            color: #fff; 
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            letter-spacing: -0.01em;
+        }
+
+        .section-title::before {
+            content: '';
+            display: inline-block;
+            width: 4px;
+            height: 18px;
+            background: linear-gradient(180deg, #60a5fa 0%, #3b82f6 100%);
+            margin-right: 12px;
+            border-radius: 4px;
+            box-shadow: 0 0 8px var(--accent-blue-glow);
+        }
+
+        /* ==========================================================================
+           7. DATA GRIDS & METRICS
+           ========================================================================== */
+        .sample-info { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); 
+            gap: 1.25rem; 
+        }
+
+        .info-item { 
+            background: rgba(0, 0, 0, 0.2); 
+            border: 1px solid var(--border-glass);
+            border-radius: 10px; 
+            padding: 1rem; 
+            transition: background 0.2s;
+        }
+        
+        .info-item:hover { background: rgba(255, 255, 255, 0.03); }
+
+        .info-item .info-label { 
+            font-size: 0.7rem; 
+            color: var(--text-subtle); 
+            font-weight: 600; 
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .info-item .info-val { 
+            font-size: 1.25rem; 
+            color: var(--text-main); 
+            font-weight: 600; 
+            margin-top: 0.4rem; 
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* ==========================================================================
+           8. MODERN SLIDERS
+           ========================================================================== */
+        .slider-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 2rem 2.5rem;
+        }
+
+        .slider-group { display: flex; flex-direction: column; }
+        
+        .slider-group label { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center;
+            font-size: 0.85rem; 
+            margin-bottom: 0.75rem; 
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .slider-group label span { 
+            color: #fff; 
+            font-weight: 600; 
+            font-variant-numeric: tabular-nums;
+            background: rgba(255,255,255,0.05);
+            padding: 0.2rem 0.5rem;
+            border-radius: 6px;
+            border: 1px solid var(--border-glass);
+        }
+        
+        /* Custom Webkit Slider Styling */
+        input[type=range] {
+            width: 100%; 
+            -webkit-appearance: none; 
+            background: transparent;
+        }
+        
+        input[type=range]:focus { outline: none; }
+        
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 6px;
+            cursor: pointer;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 4px;
+            border: 1px solid rgba(0,0,0,0.5);
+            transition: background 0.2s;
+        }
+        
+        input[type=range]:hover::-webkit-slider-runnable-track {
+            background: rgba(255, 255, 255, 0.12);
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            height: 18px;
+            width: 18px;
+            border-radius: 50%;
+            background: #fff;
+            cursor: pointer;
+            -webkit-appearance: none;
+            margin-top: -7px;
+            box-shadow: 0 0 10px rgba(255,255,255,0.3), 0 2px 4px rgba(0,0,0,0.5);
+            border: 2px solid var(--accent-blue);
+            transition: transform 0.1s, box-shadow 0.2s;
+        }
+        
+        input[type=range]:active::-webkit-slider-thumb {
+            transform: scale(1.15);
+            box-shadow: 0 0 15px var(--accent-blue-glow);
+        }
+
+        /* ==========================================================================
+           9. BUTTONS & ACTIONS
+           ========================================================================== */
+        .btn-row { 
+            display: flex; 
+            justify-content: flex-end; 
+            margin-top: 1.5rem; 
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem; 
+            border: 1px solid rgba(255,255,255,0.1); 
+            border-radius: 8px;
+            font-size: 0.9rem; 
+            font-weight: 600; 
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-family: var(--font-stack);
+        }
+
+        .btn-primary { 
+            background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%);
+            color: #fff; 
+            box-shadow: 0 2px 10px rgba(37, 99, 235, 0.2), inset 0 1px 0 rgba(255,255,255,0.15);
+        }
+
+        .btn-primary:hover { 
+            transform: translateY(-1px);
+            box-shadow: 0 4px 15px rgba(37, 99, 235, 0.3), inset 0 1px 0 rgba(255,255,255,0.2);
+            filter: brightness(1.1);
+        }
+        
+        .btn-primary:active {
+            transform: translateY(1px);
+        }
+
+        /* ==========================================================================
+           10. UTILITIES & ANIMATIONS
+           ========================================================================== */
+        .mode-panel { display: none; opacity: 0; }
+        .mode-panel.active { display: block; animation: fadeIn 0.4s ease forwards; }
+
+        @keyframes fadeIn { 
+            from { opacity: 0; } 
+            to { opacity: 1; } 
+        }
+        
+        @keyframes slideDownFade { 
+            from { opacity: 0; transform: translateY(-10px); } 
+            to { opacity: 1; transform: translateY(0); } 
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
+            70% { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        }
+
+        .empty-state {
+            color: var(--text-subtle); 
+            text-align: center; 
+            grid-column: 1 / -1; 
+            padding: 3rem 1rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .empty-state b { color: var(--text-muted); }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <div class="brand">
+        <div class="live-dot"></div>
+        <div class="brand-name">Sentinel ML</div>
+    </div>
+    <div class="header-title">Server Health & Load Diagnostics</div>
+    <div class="badge">v1.0</div>
+</div>
+
+<div class="container">
+
+    <div class="tabs">
+        <div class="tab active" onclick="switchTab('sample')">Live Snapshot</div>
+        <div class="tab" onclick="switchTab('slider')">Capacity Scenario Test</div>
+    </div>
+
+    <div id="resultBanner" class="result-banner">
+        <div class="result-content">
+            <div class="confidence-label">Model Confidence Output</div>
+            
+            <div class="gauge-wrap">
+                <div class="gauge">
+                    <svg viewBox="0 0 120 60">
+                        <path class="gauge-bg" d="M10,55 A50,50 0 0,1 110,55" />
+                        <path class="gauge-fill" id="gaugeFill" d="M10,55 A50,50 0 0,1 110,55"
+                              stroke="var(--status-safe)" stroke-dasharray="157" stroke-dashoffset="157" />
+                    </svg>
+                </div>
+            </div>
+            
+            <div class="prob" id="probText">—</div>
+            <div class="label" id="labelText"></div>
+            <div class="ml-context">Prediction based on temporal load dynamics & physical thresholds.</div>
+            
+            <div class="truth" id="truthText"></div>
+        </div>
+    </div>
+
+    <div id="samplePanel" class="mode-panel active">
+        <div class="card">
+            <div class="section-title">Current System Metrics</div>
+            <div class="sample-info" id="sampleInfo">
+                <div class="empty-state">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:0.5rem; opacity: 0.5;">
+                        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                    </svg>
+                    <span>No metrics loaded in current session.</span>
+                    <span>Click <b>Fetch Latest Snapshot</b> to retrieve live server stream.</span>
+                </div>
+            </div>
+        </div>
+        <div class="btn-row">
+            <button class="btn btn-primary" onclick="loadSample()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"></path><path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path><path d="M3 22v-6h6"></path><path d="M21 12a9 9 0 0 1-15 6.7L3 16"></path></svg>
+                Fetch Latest Snapshot
+            </button>
+        </div>
+    </div>
+
+    <div id="sliderPanel" class="mode-panel">
+        <div class="card">
+            <div class="section-title">Adjust Environmental Variables</div>
+            <div class="slider-grid">
+                <div class="slider-group">
+                    <label>CPU Utilization <span id="cpuVal">50.0%</span></label>
+                    <input type="range" id="cpuSlider" min="0" max="100" value="50" step="0.5" oninput="updateSlider()">
+                </div>
+                <div class="slider-group">
+                    <label>Core Temperature <span id="tempVal">45.0°C</span></label>
+                    <input type="range" id="tempSlider" min="25" max="95" value="45" step="0.5" oninput="updateSlider()">
+                </div>
+                <div class="slider-group">
+                    <label>Power Consumption <span id="powerVal">250W</span></label>
+                    <input type="range" id="powerSlider" min="150" max="500" value="250" step="1" oninput="updateSlider()">
+                </div>
+                <div class="slider-group">
+                    <label>Fan Array Speed <span id="fanVal">3500 RPM</span></label>
+                    <input type="range" id="fanSlider" min="1500" max="8000" value="3500" step="50" oninput="updateSlider()">
+                </div>
+                <div class="slider-group">
+                    <label>Operational Hour <span id="hourVal">12:00</span></label>
+                    <input type="range" id="hourSlider" min="0" max="23" value="12" step="1" oninput="updateSlider()">
+                </div>
+            </div>
+        </div>
+        <div class="btn-row">
+            <button class="btn btn-primary" onclick="runSimulation()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polygon points="10 8 16 12 10 16 10 8"></polygon></svg>
+                Run Diagnostic
+            </button>
+        </div>
+    </div>
+
+</div>
+
+<script>
+/* ---- Tab switching ---- */
+function switchTab(mode) {
+    document.querySelectorAll('.tab').forEach((t, i) => {
+        t.classList.toggle('active', (mode === 'sample' && i === 0) || (mode === 'slider' && i === 1));
+    });
+    
+    document.getElementById('samplePanel').classList.toggle('active', mode === 'sample');
+    document.getElementById('sliderPanel').classList.toggle('active', mode === 'slider');
+    
+    // Reset banner on tab switch
+    const b = document.getElementById('resultBanner');
+    b.className = 'result-banner';
+    b.style.display = 'none';
+}
+
+/* ---- Gauge UI Logic ---- */
+function setGauge(pct) {
+    const arc = 157; // Total arc length for our specific SVG path
+    const fill = document.getElementById('gaugeFill');
+    fill.style.strokeDashoffset = arc - (arc * pct);
+    
+    // Premium multi-color interpolation logic for the gauge stroke
+    // Green (< 40%) -> Amber (40-75%) -> Red (> 75%)
+    let strokeColor;
+    if (pct < 0.4) {
+        strokeColor = 'var(--status-safe)';
+    } else if (pct < 0.75) {
+        strokeColor = 'var(--status-warn)';
+    } else {
+        strokeColor = 'var(--status-critical)';
+    }
+    
+    fill.style.stroke = strokeColor;
+}
+
+/* ---- Results Display ---- */
+function showResult(stressIndex, isCritical, logHtml) {
+    const banner = document.getElementById('resultBanner');
+    
+    // Reset animation
+    banner.style.animation = 'none';
+    banner.offsetHeight; // Trigger reflow
+    banner.style.animation = null;
+
+    banner.className = 'result-banner ' + (isCritical ? 'warning' : 'safe');
+    banner.style.display = 'block';
+    
+    document.getElementById('probText').textContent = (stressIndex * 100).toFixed(1) + '%';
+    
+    // Adjust label text based on exact logic
+    document.getElementById('labelText').textContent = isCritical
+        ? 'CRITICAL THRESHOLD: High overload probability'
+        : 'NOMINAL: Operating within safe parameters';
+    
+    document.getElementById('truthText').innerHTML = logHtml || '';
+    
+    // Slight delay for smooth gauge animation effect
+    setTimeout(() => setGauge(stressIndex), 50);
+}
+
+/* ---- SNAPSHOT MODE (Logic Unchanged) ---- */
+const displayKeys = [
+    ["CPU_Utilization_%", "CPU Util (%)"],
+    ["CPU1_Temp_C", "CPU1 Temp (°C)"],
+    ["CPU2_Temp_C", "CPU2 Temp (°C)"],
+    ["Memory_Utilization_%", "Memory (%)"],
+    ["System_Power_W", "Power (W)"],
+    ["Avg_Fan_Speed_RPM", "Fan (RPM)"],
+    ["Inlet_Temp_C", "Inlet (°C)"],
+    ["Exhaust_Temp_C", "Exhaust (°C)"],
+    ["Air_Flow_CFM", "Airflow (CFM)"],
+    ["Voltage_V", "Voltage (V)"],
+    ["Clock_Speed_GHz", "Clock (GHz)"],
+    ["hour", "Hour Logged"],
+    ["day_of_week", "Day Logged"]
+];
+
+async function loadSample() {
+    try {
+        const res = await fetch('/random_sample');
+        const data = await res.json();
+        
+        const info = document.getElementById('sampleInfo');
+        info.innerHTML = '';
+        
+        displayKeys.forEach(([key, label]) => {
+            const v = data.features[key];
+            if (v !== undefined) {
+                info.innerHTML += `
+                    <div class="info-item">
+                        <div class="info-label">${label}</div>
+                        <div class="info-val">${typeof v === 'number' ? v.toFixed(2) : v}</div>
+                    </div>`;
+            }
+        });
+        
+        const logStatus = data.true_label === 1 
+            ? '<span style="color:var(--status-critical); font-weight:600;">Capacity Exceeded</span>' 
+            : '<span style="color:var(--status-safe); font-weight:600;">Stable</span>';
+            
+        const logHtml = `Diagnostic Log Ground Truth: ${logStatus} &nbsp;|&nbsp; Ref ID: #${data.sample_index}`;
+        
+        showResult(data.overload_probability, data.early_warning, logHtml);
+        
+    } catch (err) { 
+        alert('Diagnostic Fetch Error: ' + err.message); 
+    }
+}
+
+/* ---- SCENARIO MODE (Logic Unchanged) ---- */
+function updateSlider() {
+    document.getElementById('cpuVal').textContent = parseFloat(document.getElementById('cpuSlider').value).toFixed(1) + '%';
+    document.getElementById('tempVal').textContent = parseFloat(document.getElementById('tempSlider').value).toFixed(1) + '°C';
+    document.getElementById('powerVal').textContent = document.getElementById('powerSlider').value + 'W';
+    document.getElementById('fanVal').textContent = document.getElementById('fanSlider').value + ' RPM';
+    document.getElementById('hourVal').textContent = document.getElementById('hourSlider').value.padStart(2, '0') + ':00';
+}
+
+async function runSimulation() {
+    const payload = {
+        "CPU_Utilization_%": parseFloat(document.getElementById('cpuSlider').value),
+        "CPU1_Temp_C": parseFloat(document.getElementById('tempSlider').value),
+        "System_Power_W": parseFloat(document.getElementById('powerSlider').value),
+        "Avg_Fan_Speed_RPM": parseFloat(document.getElementById('fanSlider').value),
+        "hour": parseInt(document.getElementById('hourSlider').value)
+    };
+    
+    try {
+        const res = await fetch('/simulate', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        
+        showResult(data.overload_probability, data.early_warning, 'Simulated Edge Projection');
+        
+    } catch (err) { 
+        alert('Simulation Error: ' + err.message); 
+    }
+}
+</script>
+</body>
+</html>
